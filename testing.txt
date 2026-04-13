@@ -1,0 +1,72 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+#define RELAY_PIN 26
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+bool relayState = false;
+unsigned long previousMillis = 0;
+const unsigned long interval = 1000;
+
+void showDisplay(bool state) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("Praktikum ESP32");
+  display.println("PlatformIO + Wokwi");
+  display.println("--------------------");
+
+  display.setCursor(0, 30);
+  display.print("Relay: ");
+  display.println(state ? "ON" : "OFF");
+
+  display.setCursor(0, 45);
+  display.print("GPIO23: ");
+  display.println(state ? "HIGH" : "LOW");
+
+  display.display();
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+
+  Wire.begin(21, 22);
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED SSD1306 gagal diinisialisasi");
+    while (true) {
+      delay(10);
+    }
+  }
+
+  Serial.println("Sistem mulai...");
+  Serial.println("ESP32 + Relay + OLED SSD1306");
+  showDisplay(false);
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    relayState = !relayState;
+
+    digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
+
+    Serial.print("Status relay: ");
+    Serial.println(relayState ? "ON" : "OFF");
+
+    showDisplay(relayState);
+  }
+}
