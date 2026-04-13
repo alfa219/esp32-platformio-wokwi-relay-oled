@@ -1,49 +1,56 @@
-# ESP32 Relay & OLED Control – PlatformIO + Wokwi
+# ESP32 PlatformIO Wokwi Relay OLED Blynk
 
-Proyek ini adalah simulasi sistem **kontrol relay dengan umpan balik OLED** menggunakan **ESP32**, dikembangkan dengan **PlatformIO di VS Code** dan disimulasikan menggunakan **Wokwi**.  
-Proyek ini cocok sebagai bahan praktikum *Sistem Akuisisi Data* dan contoh integrasi workflow modern (VS Code + PlatformIO + Wokwi).
+Proyek ini adalah simulasi dan pengembangan sistem kontrol **relay/LED berbasis ESP32** dengan **PlatformIO** di **VS Code**, **Wokwi** sebagai simulator hardware, **OLED SSD1306** sebagai display lokal, dan **Blynk Cloud** sebagai antarmuka kontrol jarak jauh. [file:1][web:146]
 
-## Fitur Utama
+Project ini dibuat sebagai pengembangan dari praktikum *Sistem Akuisisi Data*, khususnya pada bagian komunikasi platform, simulasi ESP32, penambahan relay/LED/OLED, dan integrasi Blynk Cloud. [file:1]
 
-- Board: **ESP32 DevKit** (Arduino framework)
-- Kontrol **relay** dengan logika otomatis berbasis timer
-- Tampilan status sistem pada **OLED SSD1306** (mode, status relay, interval)
-- Simulasi penuh di **Wokwi** (tanpa hardware fisik)
-- Struktur proyek rapi dengan **PlatformIO** (mudah dipindahkan ke hardware nyata)
+## Fitur
 
-## Prasyarat
+- ESP32 DevKit sebagai mikrokontroler utama. [file:1]
+- Simulasi rangkaian dengan Wokwi. [file:1][web:146]
+- Pengembangan firmware menggunakan PlatformIO di VS Code. [web:177]
+- Kontrol output melalui Blynk menggunakan Virtual Pin. [web:147]
+- Tampilan status perangkat pada OLED SSD1306. [file:1]
+- Siap dikembangkan ke multi-channel LED/relay atau sensor IoT lain. [file:1][web:180]
 
-Sebelum memulai, siapkan:
+## Arsitektur Sistem
 
-- **Visual Studio Code**
-- Extension:
-  - **PlatformIO IDE**
-  - **Wokwi** untuk VS Code
-- PlatformIO sudah terpasang dan bisa membuat project ESP32
+Sistem bekerja dengan alur berikut:
 
-> Catatan: Pastikan koneksi internet aktif saat pertama kali build untuk mengunduh library yang diperlukan (Adafruit GFX & Adafruit SSD1306).
+1. ESP32 terhubung ke WiFi Wokwi (`Wokwi-GUEST`). [web:146][web:180]
+2. ESP32 login ke Blynk Cloud menggunakan `BLYNK_TEMPLATE_ID`, `BLYNK_TEMPLATE_NAME`, dan `BLYNK_AUTH_TOKEN`. [file:1][web:148][web:151]
+3. Widget di dashboard Blynk mengirim nilai ke Virtual Pin, misalnya `V0`. [file:1][web:147]
+4. ESP32 membaca nilai tersebut melalui `BLYNK_WRITE(V0)`, lalu menyalakan atau mematikan relay/LED fisik. [web:147][web:180]
+5. OLED menampilkan status koneksi WiFi, koneksi Blynk, dan status output lokal. [file:1]
 
-## Struktur Proyek
+## Komponen yang Digunakan
+
+- ESP32 DevKit
+- Relay module / LED output
+- OLED SSD1306 I2C
+- Wokwi Simulator
+- PlatformIO IDE
+- Blynk Cloud Dashboard [file:1][web:146]
+
+## Struktur Folder
 
 ```text
 .
-├─ platformio.ini
-├─ wokwi.toml
-├─ diagram.json
-├─ src/
-│  └─ main.cpp
-└─ README.md
+├── .gitignore
+├── README.md
+├── platformio.ini
+├── wokwi.toml
+├── diagram.json
+├── src/
+│   └── main.cpp
+├── include/
+├── lib/
+└── test/
 ```
 
-Penjelasan:
+## Konfigurasi `platformio.ini`
 
-- `platformio.ini` – konfigurasi PlatformIO (board, framework, library, serial speed)
-- `wokwi.toml` – konfigurasi Wokwi untuk mengaitkan firmware PlatformIO dengan simulator
-- `diagram.json` – skema rangkaian di Wokwi (ESP32, relay, LED, OLED, tombol jika ada)
-- `src/main.cpp` – kode program utama ESP32
-- `README.md` – dokumentasi proyek
-
-## Konfigurasi PlatformIO
+Pastikan `platformio.ini` memuat library yang dibutuhkan, termasuk Blynk dan OLED:
 
 ```ini
 [env:esp32dev]
@@ -53,128 +60,80 @@ framework = arduino
 monitor_speed = 115200
 
 lib_deps =
+  blynkkk/Blynk
   adafruit/Adafruit GFX Library
   adafruit/Adafruit SSD1306
 ```
 
-- `board = esp32dev` menargetkan board ESP32 DevKit
-- `monitor_speed` harus sama dengan nilai di `Serial.begin()` di `main.cpp`
-- `lib_deps` memastikan library OLED diunduh otomatis saat build
+## Konfigurasi Blynk
 
-## Konfigurasi Wokwi
+Agar firmware bisa terhubung ke Blynk Cloud, lakukan langkah berikut:
 
-```toml
-[wokwi]
-version = 1
-firmware = ".pio/build/esp32dev/firmware.bin"
-elf = ".pio/build/esp32dev/firmware.elf"
+1. Buat akun di Blynk Cloud. [file:1]
+2. Buat **Template** baru untuk ESP32 dengan koneksi WiFi. [file:1]
+3. Tambahkan **Datastream** Virtual Pin, misalnya:
+   - `V0` untuk kontrol ON/OFF output
+   - `V1` untuk LED indikator status (opsional) [file:1][web:147][web:170]
+4. Tambahkan widget di dashboard:
+   - **Switch** untuk kontrol perangkat
+   - **LED widget** untuk indikator status (opsional) [web:147][web:170]
+5. Buat **Device** dari template.
+6. Salin `Template ID`, `Template Name`, dan `Auth Token` ke file `src/main.cpp`. [file:1][web:148][web:151][web:154]
+
+## WiFi untuk Wokwi
+
+Untuk simulasi Wokwi, gunakan:
+
+```cpp
+char ssid[] = "Wokwi-GUEST";
+char pass[] = "";
 ```
 
-- `firmware` menunjuk ke file `.bin` hasil build PlatformIO
-- `elf` digunakan Wokwi untuk debug yang lebih detail  
-Pastikan environment (`esp32dev`) sama dengan yang digunakan di `platformio.ini`.
-
-## Diagram Wokwi
-
-File `diagram.json` mendeskripsikan rangkaian di Wokwi, misalnya:
-
-- 1x **ESP32 DevKit**
-- 1x **Relay module**
-- 1x LED + resistor sebagai indikator beban relay
-- 1x **OLED SSD1306** (I2C, alamat 0x3C)
-- (Opsional) Push button untuk mengganti mode/manual toggle
-
-Koneksi umum:
-
-- Relay IN → GPIO23  
-- OLED SDA → GPIO21  
-- OLED SCL → GPIO22  
-- VCC untuk relay + OLED → 3V3  
-- Semua GND → GND ESP32
-
-Detail aktual koneksi ada di dalam `diagram.json`.
-
-## Kode Utama (`src/main.cpp`)
-
-Secara garis besar, program melakukan:
-
-1. Inisialisasi serial (`Serial.begin(115200)`), pin relay, dan OLED SSD1306
-2. Menampilkan informasi status di OLED (mode, status relay, interval)
-3. Menjalankan logika **mode otomatis** (relay toggle dengan interval tertentu) atau **mode manual** (berbasis command atau push button, tergantung versi)
-4. Mengirim log status ke serial terminal untuk debugging
-
-Lihat isi lengkap `src/main.cpp` di repo ini untuk implementasi detail.
+Wokwi menyediakan access point virtual untuk ESP32 sehingga perangkat dapat mensimulasikan koneksi internet. [web:140][web:143]
 
 ## Cara Menjalankan
 
-### 1. Clone Repository
-
+1. Clone repository:
 ```bash
-git clone https://github.com/<username>/<nama-repo>.git
-cd <nama-repo>
+git clone https://github.com/alfa219/esp32-platformio-wokwi-relay-oled.git
+cd esp32-platformio-wokwi-relay-oled
 ```
 
-Ganti `<username>` dan `<nama-repo>` sesuai GitHub kamu.
+2. Buka project di VS Code.
 
-### 2. Buka di VS Code
+3. Pastikan extension berikut sudah terpasang:
+- PlatformIO IDE
+- Wokwi for VS Code [web:177]
 
-- Buka folder proyek di VS Code
-- Pastikan extension **PlatformIO IDE** dan **Wokwi** sudah aktif
-
-### 3. Build dengan PlatformIO
-
-Dari VS Code:
-
-- Buka panel PlatformIO
-- Pilih environment `esp32dev`
-- Klik **Build**
-
-Atau via command line:
-
+4. Build project:
 ```bash
 pio run
 ```
 
-Jika build sukses, firmware akan ada di `.pio/build/esp32dev/firmware.bin`.
+5. Jalankan simulasi Wokwi dari VS Code.
 
-### 4. Jalankan Simulasi di Wokwi
+6. Pastikan kredensial Blynk sudah benar di `src/main.cpp`.
 
-- Jalankan perintah Wokwi di VS Code (mis. “Start Simulation”)  
-- Extension akan membaca `wokwi.toml` dan `diagram.json`, lalu memuat firmware ESP32
+7. Buka dashboard Blynk dan uji kontrol output dari widget yang terhubung ke Virtual Pin. [web:147][web:170]
 
-Saat simulasi berjalan, Anda akan melihat:
+## Catatan Keamanan
 
-- OLED menampilkan status sistem (mode, relay, interval)
-- Relay dan LED berubah sesuai mode/interval yang diprogram
-- Serial terminal menampilkan log status
+`BLYNK_AUTH_TOKEN` adalah kredensial perangkat dan sebaiknya tidak dipublikasikan di repository publik. Jika token sudah terlanjur dipublikasikan, lakukan regenerasi token dari Blynk Device Info. Praktik ini penting dalam keamanan sistem IoT berbasis cloud. [web:151][web:154]
 
-## Perilaku Sistem
+## Pengembangan Lanjutan
 
-- **Mode AUTO**  
-  Relay melakukan toggle ON/OFF dengan interval tertentu (misal 1000 ms).  
-  OLED menampilkan `Mode: AUTO`, status relay, dan interval.
+Beberapa arah pengembangan selanjutnya:
 
-- **Mode MANUAL**  
-  Relay diubah ON/OFF berdasarkan input (serial atau push button).  
-  OLED menampilkan `Mode: MANUAL` dan status relay saat ini.
+- Kontrol 4 LED / 4 relay dari Blynk, sesuai latihan lanjutan pada laporan. [file:1]
+- Penambahan sensor seperti DHT22 atau LDR.
+- Sinkronisasi dashboard Blynk dengan OLED lokal.
+- Pemisahan kode menjadi beberapa modul agar struktur firmware lebih bersih. [file:1][web:180]
 
-Jika menggunakan terminal di VS Code + Wokwi, perhatikan bahwa sebagian versi hanya nyaman untuk melihat output, sehingga push button di `diagram.json` biasanya menjadi antarmuka utama untuk user.
+## Repository
 
-## Ide Pengembangan Lanjutan
+GitHub:  
+`https://github.com/alfa219/esp32-platformio-wokwi-relay-oled`
 
-- Versi dengan **4 relay / 4 LED** (multi-channel control)
-- Integrasi dengan **Blynk Cloud** untuk kontrol dari dashboard web/mobile
-- Penambahan sensor (DHT22, LDR, dsb.) sehingga relay menjadi aktuator berbasis kondisi real
-- Refactor kode menjadi modul-modul terpisah (mis. `display.cpp`, `logic.cpp`) untuk arsitektur lebih bersih
+## License
 
-## Lisensi
-
-Tentukan lisensi yang kamu inginkan, contoh:
-
-```text
-MIT License
-```
-
-Atau:
-
-> Proyek ini dirilis dengan lisensi MIT. Silakan gunakan, modifikasi, dan kembangkan sesuai kebutuhan.
+Tambahkan lisensi sesuai kebutuhan, misalnya MIT License.

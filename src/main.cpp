@@ -1,4 +1,10 @@
-#include <Arduino.h>
+#define BLYNK_TEMPLATE_ID "TMPL6CNsifER0"
+#define BLYNK_TEMPLATE_NAME "control LED"
+#define BLYNK_AUTH_TOKEN "XEE4RQGoC3Wjlx2bAbFi0NhD_mDa4P9C"
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -11,34 +17,13 @@
 #define SDA_PIN 21
 #define SCL_PIN 22
 
+char ssid[] = "Wokwi-GUEST";
+char pass[] = "";
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+BlynkTimer timer;
 
 bool relayState = false;
-bool autoMode = true;
-
-unsigned long previousMillis = 0;
-unsigned long blinkInterval = 1000;
-
-String inputBuffer = "";
-
-void updateRelay(bool state) {
-  relayState = state;
-  digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
-}
-
-void printStatus() {
-  Serial.println("===== STATUS SISTEM =====");
-  Serial.print("Mode        : ");
-  Serial.println(autoMode ? "AUTO" : "MANUAL");
-
-  Serial.print("Relay       : ");
-  Serial.println(relayState ? "ON" : "OFF");
-
-  Serial.print("Interval    : ");
-  Serial.print(blinkInterval);
-  Serial.println(" ms");
-  Serial.println("=========================");
-}
 
 void updateDisplay() {
   display.clearDisplay();
@@ -46,129 +31,66 @@ void updateDisplay() {
   display.setTextColor(SSD1306_WHITE);
 
   display.setCursor(0, 0);
-  display.println("ESP32 Control Panel");
-  display.println("--------------------");
+  display.println("ESP32 + Blynk");
+  display.println("----------------");
 
   display.setCursor(0, 18);
-  display.print("Mode  : ");
-  display.println(autoMode ? "AUTO" : "MANUAL");
+  display.print("WiFi  : ");
+  display.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
 
   display.setCursor(0, 32);
-  display.print("Relay : ");
-  display.println(relayState ? "ON" : "OFF");
+  display.print("Blynk : ");
+  display.println(Blynk.connected() ? "Connected" : "Disconnected");
 
   display.setCursor(0, 46);
-  display.print("Intvl : ");
-  display.print(blinkInterval);
-  display.println(" ms");
+  display.print("Relay : ");
+  display.println(relayState ? "ON" : "OFF");
 
   display.display();
 }
 
-void printHelp() {
-  Serial.println("\nPerintah yang tersedia:");
-  Serial.println("on              -> Relay ON");
-  Serial.println("off             -> Relay OFF");
-  Serial.println("auto            -> Mode otomatis");
-  Serial.println("manual          -> Mode manual");
-  Serial.println("toggle          -> Toggle relay");
-  Serial.println("status          -> Tampilkan status");
-  Serial.println("interval 500    -> Ubah interval auto (ms)");
-  Serial.println("help            -> Tampilkan bantuan\n");
+void publishStateToBlynk() {
+  Blynk.virtualWrite(V0, relayState ? 1 : 0); // sinkronkan switch
+  Blynk.virtualWrite(V1, relayState ? 255 : 0); // LED widget indikator
 }
 
-void processCommand(String cmd) {
-  cmd.trim();
-  cmd.toLowerCase();
+void setRelay(bool state) {
+  relayState = state;
+  digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
 
-  if (cmd == "on") {
-    autoMode = false;
-    updateRelay(true);
-    Serial.println("Relay diubah ke ON (MANUAL)");
-  }
-  else if (cmd == "off") {
-    autoMode = false;
-    updateRelay(false);
-    Serial.println("Relay diubah ke OFF (MANUAL)");
-  }
-  else if (cmd == "toggle") {
-    autoMode = false;
-    updateRelay(!relayState);
-    Serial.println("Relay di-toggle (MANUAL)");
-  }
-  else if (cmd == "auto") {
-    autoMode = true;
-    Serial.println("Mode diubah ke AUTO");
-  }
-  else if (cmd == "manual") {
-    autoMode = false;
-    Serial.println("Mode diubah ke MANUAL");
-  }
-  else if (cmd == "status") {
-    printStatus();
-  }
-  else if (cmd.startsWith("interval")) {
-    int spaceIndex = cmd.indexOf(' ');
-    if (spaceIndex > 0) {
-      String valueStr = cmd.substring(spaceIndex + 1);
-      unsigned long newInterval = valueStr.toInt();
+  Serial.print("Relay changed to: ");
+  Serial.println(relayState ? "ON" : "OFF");
 
-      if (newInterval >= 100) {
-        blinkInterval = newInterval;
-        Serial.print("Interval auto diubah menjadi ");
-        Serial.print(blinkInterval);
-        Serial.println(" ms");
-      } else {
-        Serial.println("Interval terlalu kecil. Gunakan >= 100 ms");
-      }
-    } else {
-      Serial.println("Format salah. Contoh: interval 1000");
-    }
-  }
-  else if (cmd == "help") {
-    printHelp();
-  }
-  else if (cmd.length() > 0) {
-    Serial.println("Perintah tidak dikenali. Ketik: help");
-  }
+  updateDisplay();
+  publishStateToBlynk();
+}
+
+BLYNK_CONNECTED() {
+  Serial.println("Blynk connected");
+  Blynk.syncVirtual(V0);
+  publishStateToBlynk();
+  updateDisplay();
+}
+
+BLYNK_WRITE(V0) {
+  int value = param.asInt();
+  setRelay(value == 1);
+}
+
+void checkConnection() {
+  Serial.print("WiFi: ");
+  Serial.print(WiFi.status() == WL_CONNECTED ? "OK" : "NO");
+  Serial.print(" | Blynk: ");
+  Serial.println(Blynk.connected() ? "OK" : "NO");
 
   updateDisplay();
 }
 
-void readSerialCommand() {
-  while (Serial.available()) {
-    char c = Serial.read();
-
-    if (c == '\n' || c == '\r') {
-      if (inputBuffer.length() > 0) {
-        processCommand(inputBuffer);
-        inputBuffer = "";
-      }
-    } else {
-      inputBuffer += c;
-    }
-  }
-}
-
-void handleAutoMode() {
-  if (!autoMode) return;
-
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= blinkInterval) {
-    previousMillis = currentMillis;
-    updateRelay(!relayState);
-
-    Serial.print("[AUTO] Relay: ");
-    Serial.println(relayState ? "ON" : "OFF");
-
-    updateDisplay();
-  }
-}
-
 void setup() {
   Serial.begin(115200);
+
   pinMode(RELAY_PIN, OUTPUT);
-  updateRelay(false);
+  digitalWrite(RELAY_PIN, LOW);
 
   Wire.begin(SDA_PIN, SCL_PIN);
 
@@ -182,14 +104,18 @@ void setup() {
   display.clearDisplay();
   display.display();
 
-  Serial.println("Sistem mulai...");
-  Serial.println("ESP32 + Relay + OLED + Serial Command");
-  printHelp();
-  printStatus();
+  Serial.println("Booting ESP32...");
+  Serial.println("Connecting to WiFi and Blynk...");
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  timer.setInterval(2000L, checkConnection);
+
   updateDisplay();
+  publishStateToBlynk();
 }
 
 void loop() {
-  readSerialCommand();
-  handleAutoMode();
+  Blynk.run();
+  timer.run();
 }
